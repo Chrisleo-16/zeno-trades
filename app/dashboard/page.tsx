@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { analyticsStore, tradesStore, strategiesStore } from '@/lib/store';
+import { useRealtimeAnalytics, useRealtimeTrades } from '@/hooks/use-realtime';
 import {
   BarChart3, TrendingUp, Award, Zap, ArrowRight,
-  BookOpen, Activity, Target, ChevronRight,
+  BookOpen, Activity, Target, ChevronRight, Wifi, WifiOff,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -27,14 +28,37 @@ export default function DashboardPage() {
   const [disciplineScore, setDisciplineScore] = useState(0);
   const [tradeCount, setTradeCount] = useState(0);
   const [strategiesCount, setStrategiesCount] = useState(0);
+  const [userId, setUserId] = useState('current_user');
+  
+  // Realtime hooks
+  const { trades, isConnected: tradesConnected } = useRealtimeTrades(userId);
+  const { analytics, isConnected: analyticsConnected } = useRealtimeAnalytics(userId);
 
   useEffect(() => {
+    // Initialize with localStorage data
     setWinRate(analyticsStore.getWinRate());
     setTotalPnL(analyticsStore.getTotalPnL());
     setDisciplineScore(analyticsStore.getDisciplineScore());
     setTradeCount(tradesStore.getAll().length);
     setStrategiesCount(strategiesStore.getAll().length);
   }, []);
+
+  // Update when realtime data changes
+  useEffect(() => {
+    if (trades.length > 0) {
+      setTradeCount(trades.length);
+      const wins = trades.filter(t => t.status === 'win').length;
+      setWinRate((wins / trades.length) * 100);
+      setTotalPnL(trades.reduce((sum, trade) => sum + (trade.pnl || 0), 0));
+    }
+  }, [trades]);
+
+  useEffect(() => {
+    if (analytics) {
+      setWinRate(analytics.win_rate);
+      setTotalPnL(analytics.total_pnl);
+    }
+  }, [analytics]);
 
   const stats = [
     {
@@ -265,6 +289,31 @@ export default function DashboardPage() {
             );
           })}
         </div>
+      </motion.div>
+
+      {/* ── Realtime Status Indicator ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="flex items-center gap-2 p-3 rounded-xl"
+        style={{
+          background: tradesConnected && analyticsConnected 
+            ? 'rgba(0,255,135,0.05)' 
+            : 'rgba(245,158,11,0.05)',
+          border: tradesConnected && analyticsConnected
+            ? '1px solid rgba(0,255,135,0.1)'
+            : '1px solid rgba(245,158,11,0.1)',
+        }}
+      >
+        {tradesConnected && analyticsConnected ? (
+          <Wifi className="w-4 h-4 text-emerald-400" />
+        ) : (
+          <WifiOff className="w-4 h-4 text-amber-400" />
+        )}
+        <span className="text-xs text-white/50">
+          {tradesConnected && analyticsConnected ? 'Realtime sync active' : 'Using local data'}
+        </span>
       </motion.div>
 
       {/* ── First trade CTA (only when empty) ── */}

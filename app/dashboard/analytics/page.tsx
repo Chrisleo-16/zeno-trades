@@ -61,7 +61,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     const all = tradesStore.getAll();
     const profile = typeof window !== 'undefined'
-      ? JSON.parse(localStorage.getItem('sniper_profile') || '{}')
+      ? JSON.parse(localStorage.getItem('zeno_profile') || '{}')
       : {};
 
     setTrades(all);
@@ -74,7 +74,10 @@ export default function AnalyticsPage() {
     setAvgLoss(analyticsStore.getAvgLoss());
     setTagStats(analyticsStore.getTradesByTag());
     setDdStats(calcDrawdown(all, profile.startingBalance ?? 10000));
-    setCalData(buildCalendarData(all));
+    setCalData(buildCalendarData(all).reduce((acc, day) => {
+      acc[day.date] = day;
+      return acc;
+    }, {} as Record<string, DayStats>));
     setAllTags(tagsStore.getAll());
   }, []);
 
@@ -87,9 +90,9 @@ export default function AnalyticsPage() {
   const pairData = Object.entries(tradesByPair).map(([name, value]) => ({ name, value }));
 
   const emotionData = trades.reduce((acc, t) => {
-    const e = acc.find((x: any) => x.name === t.emotionalState);
+    const e = acc.find((x: any) => x.name === t.emotional_state);
     if (e) e.value++;
-    else acc.push({ name: t.emotionalState, value: 1 });
+    else acc.push({ name: t.emotional_state, value: 1 });
     return acc;
   }, [] as Array<{ name: string; value: number }>);
 
@@ -364,7 +367,7 @@ export default function AnalyticsPage() {
               {winRate >= 55 && (
                 <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                   className="flex gap-3 p-4 rounded-xl" style={{ background: 'rgba(0,255,135,0.05)', border: '1px solid rgba(0,255,135,0.12)' }}>
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                   <div>
                     <p className="text-emerald-400 text-sm font-semibold mb-0.5" style={{ fontFamily: "'DM Mono',monospace" }}>Positive Win Rate</p>
                     <p className="text-white/40 text-xs leading-relaxed">Your {winRate.toFixed(1)}% win rate shows consistent strategy execution. Keep following your system.</p>
@@ -374,7 +377,7 @@ export default function AnalyticsPage() {
               {profitFactor >= 1.5 && (
                 <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 }}
                   className="flex gap-3 p-4 rounded-xl" style={{ background: 'rgba(0,255,135,0.05)', border: '1px solid rgba(0,255,135,0.12)' }}>
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                   <div>
                     <p className="text-emerald-400 text-sm font-semibold mb-0.5" style={{ fontFamily: "'DM Mono',monospace" }}>Strong Profit Factor</p>
                     <p className="text-white/40 text-xs leading-relaxed">Profit factor of {profitFactor.toFixed(2)} means you earn ${profitFactor.toFixed(2)} for every $1 you lose. Elite traders sit above 2.0.</p>
@@ -384,7 +387,7 @@ export default function AnalyticsPage() {
               {ddStats && ddStats.currentConsecutiveLosses >= 2 && (
                 <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}
                   className="flex gap-3 p-4 rounded-xl" style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
-                  <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
                   <div>
                     <p className="text-red-400 text-sm font-semibold mb-0.5" style={{ fontFamily: "'DM Mono',monospace" }}>Active Losing Streak</p>
                     <p className="text-white/40 text-xs leading-relaxed">{ddStats.currentConsecutiveLosses} consecutive losses. Consider stopping for today and reviewing your last trades before continuing.</p>
@@ -394,7 +397,7 @@ export default function AnalyticsPage() {
               {emotionData.some((s) => s.name === 'frustrated' && s.value > trades.length * 0.3) && (
                 <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 }}
                   className="flex gap-3 p-4 rounded-xl" style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.12)' }}>
-                  <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                   <div>
                     <p className="text-amber-400 text-sm font-semibold mb-0.5" style={{ fontFamily: "'DM Mono',monospace" }}>Emotional Risk Alert</p>
                     <p className="text-white/40 text-xs leading-relaxed">High frustration rate detected. Enforce a 2-loss daily stop rule to protect your account.</p>
@@ -404,7 +407,7 @@ export default function AnalyticsPage() {
               {totalPnL > 0 && (
                 <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}
                   className="flex gap-3 p-4 rounded-xl" style={{ background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.12)' }}>
-                  <TrendingUp className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <TrendingUp className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                   <div>
                     <p className="text-blue-400 text-sm font-semibold mb-0.5" style={{ fontFamily: "'DM Mono',monospace" }}>Profitable Trend</p>
                     <p className="text-white/40 text-xs leading-relaxed">You're net profitable. Build consistency before scaling position sizes.</p>

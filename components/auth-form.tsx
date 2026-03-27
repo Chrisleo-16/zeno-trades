@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { authStore } from '@/lib/auth';
 import { ArrowRight, Eye, EyeOff, Activity, TrendingUp, Award, BarChart2 } from 'lucide-react';
+import { createClient } from '@/lib/client';
 
 interface AuthFormProps {
   onSuccess: () => void;
@@ -191,6 +192,30 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [focused, setFocused]           = useState<string | null>(null);
   const [success, setSuccess]           = useState(false);
+  const [resetSent, setResetSent]       = useState(false);
+
+  const supabase = createClient();
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Please enter your email address first');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setResetSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send reset email');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,9 +223,9 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
     setLoading(true);
     try {
       if (isLogin) {
-        authStore.login(email, password);
+        await authStore.login(email, password);
       } else {
-        authStore.register(email, password, name);
+        await authStore.register(email, password, name);
       }
       setSuccess(true);
       setTimeout(onSuccess, 700);
@@ -324,14 +349,27 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
                 <div style={fieldWrap('password')}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                     <label style={{ ...fieldLabel, marginBottom: 0 }}>Password</label>
-                    {isLogin && (
-                      <button type="button" style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        fontSize: 12, color: '#1a7a4a', fontWeight: 600,
-                        fontFamily: "'DM Mono',monospace",
-                      }}>
+                    {isLogin && !resetSent && (
+                      <button 
+                        type="button" 
+                        onClick={handleForgotPassword}
+                        disabled={loading}
+                        style={{
+                          background: 'none', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+                          fontSize: 12, color: loading ? '#94a3b8' : '#1a7a4a', fontWeight: 600,
+                          fontFamily: "'DM Mono',monospace",
+                        }}
+                      >
                         Forgot?
                       </button>
+                    )}
+                    {resetSent && (
+                      <span style={{
+                        fontSize: 11, color: '#16a34a', fontWeight: 600,
+                        fontFamily: "'DM Mono',monospace",
+                      }}>
+                        Email sent!
+                      </span>
                     )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -352,8 +390,19 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
                 </div>
               </div>
 
-              {/* Error */}
+              {/* Success/Info Messages */}
               <AnimatePresence>
+                {resetSent && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    style={{ marginTop: 16, padding: '10px 14px', borderRadius: 10,
+                      background: '#f0fdf4', border: '1px solid #bbf7d0',
+                      color: '#16a34a', fontSize: 12, fontFamily: "'DM Mono',monospace" }}>
+                    Password reset email sent! Check your inbox.
+                  </motion.div>
+                )}
                 {error && (
                   <motion.div
                     initial={{ opacity: 0, y: -6 }}
@@ -370,25 +419,26 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
               {/* Submit */}
               <motion.button
                 type="submit"
-                disabled={loading || success}
-                whileHover={!loading && !success ? { scale: 1.01, y: -1 } : {}}
-                whileTap={!loading && !success ? { scale: 0.99 } : {}}
+                disabled={loading || success || resetSent}
+                whileHover={!loading && !success && !resetSent ? { scale: 1.01, y: -1 } : {}}
+                whileTap={!loading && !success && !resetSent ? { scale: 0.99 } : {}}
                 style={{
                   marginTop: 32, width: '100%', height: 52, borderRadius: 12,
-                  border: 'none', cursor: loading || success ? 'not-allowed' : 'pointer',
+                  border: 'none', cursor: loading || success || resetSent ? 'not-allowed' : 'pointer',
                   background: success ? '#16a34a'
+                    : resetSent ? '#94a3b8'
                     : loading ? 'rgba(10,61,32,0.4)'
                     : 'linear-gradient(135deg,#0a3d20 0%,#1a7a4a 100%)',
                   color: '#fff', fontWeight: 800, fontSize: 14,
                   fontFamily: "'DM Mono',monospace", letterSpacing: '0.03em',
-                  boxShadow: !loading && !success ? '0 4px 20px rgba(10,61,32,0.35), 0 1px 0 rgba(255,255,255,0.1) inset' : 'none',
+                  boxShadow: !loading && !success && !resetSent ? '0 4px 20px rgba(10,61,32,0.35), 0 1px 0 rgba(255,255,255,0.1) inset' : 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   position: 'relative', overflow: 'hidden',
                   transition: 'background 0.3s, box-shadow 0.3s',
                 }}
               >
                 {/* Shimmer */}
-                {!loading && !success && (
+                {!loading && !success && !resetSent && (
                   <motion.div style={{
                     position: 'absolute', inset: 0, pointerEvents: 'none',
                     background: 'linear-gradient(110deg,transparent 35%,rgba(255,255,255,0.12) 50%,transparent 65%)',
@@ -401,6 +451,11 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
                   <motion.span initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
                     style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span>✓</span> Entering dashboard…
+                  </motion.span>
+                ) : resetSent ? (
+                  <motion.span initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>✓</span> Check your email
                   </motion.span>
                 ) : loading ? (
                   <motion.div animate={{ rotate: 360 }}
@@ -418,12 +473,23 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
             {/* Switch */}
             <p style={{ marginTop: 24, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
               {isLogin ? "Don't have an account? " : 'Already have an account? '}
-              <button onClick={() => { setIsLogin(!isLogin); setError(''); }}
+              <button onClick={() => { setIsLogin(!isLogin); setError(''); setResetSent(false); }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer',
                   fontWeight: 700, color: '#0a3d20', fontSize: 13,
                   fontFamily: "'DM Mono',monospace" }}>
                 {isLogin ? 'Sign up' : 'Log in'}
               </button>
+              {resetSent && (
+                <>
+                  {' · '}
+                  <button onClick={() => setResetSent(false)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer',
+                      fontWeight: 600, color: '#1a7a4a', fontSize: 13,
+                      fontFamily: "'DM Mono',monospace" }}>
+                    Try again
+                  </button>
+                </>
+              )}
             </p>
           </div>
         </div>

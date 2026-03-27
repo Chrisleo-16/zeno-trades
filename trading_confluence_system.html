@@ -1,0 +1,473 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+
+.sys-wrap { padding: 1rem 0; }
+
+.section-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  margin-bottom: 10px;
+}
+
+.tier-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tier-card {
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+}
+
+.tier-card .t-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  margin-bottom: 6px;
+}
+
+.tier-card .t-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+
+.tier-card .t-sub {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 99px;
+  margin-top: 6px;
+}
+
+.badge-blue { background: var(--color-background-info); color: var(--color-text-info); }
+.badge-amber { background: #FAEEDA; color: #854F0B; }
+.badge-green { background: #EAF3DE; color: #3B6D11; }
+
+/* Dark mode badges */
+@media (prefers-color-scheme: dark) {
+  .badge-amber { background: #412402; color: #FAC775; }
+  .badge-green { background: #173404; color: #C0DD97; }
+}
+
+.divider {
+  height: 0.5px;
+  background: var(--color-border-tertiary);
+  margin: 18px 0;
+}
+
+/* Checklist */
+.checklist { display: flex; flex-direction: column; gap: 6px; }
+
+.check-group { margin-bottom: 14px; }
+
+.check-group-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: background .15s;
+  user-select: none;
+}
+
+.check-item:hover { background: var(--color-background-secondary); }
+.check-item.checked { border-color: var(--color-border-success); background: var(--color-background-success); }
+
+.check-item input[type=checkbox] { display: none; }
+
+.check-box {
+  width: 17px;
+  height: 17px;
+  border: 1.5px solid var(--color-border-secondary);
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background-primary);
+  transition: background .15s, border-color .15s;
+}
+
+.check-item.checked .check-box {
+  background: var(--color-text-success);
+  border-color: var(--color-text-success);
+}
+
+.check-tick {
+  width: 9px;
+  height: 6px;
+  border-left: 1.5px solid #fff;
+  border-bottom: 1.5px solid #fff;
+  transform: rotate(-45deg) translateY(-1px);
+  opacity: 0;
+  transition: opacity .15s;
+}
+
+.check-item.checked .check-tick { opacity: 1; }
+
+.check-text {
+  font-size: 13px;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.check-sub {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+/* Score bar */
+.score-wrap {
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-lg);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.score-num {
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  min-width: 52px;
+}
+
+.score-right { flex: 1; }
+
+.score-bar-bg {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--color-border-tertiary);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.score-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--color-text-secondary);
+  transition: width .4s ease, background .4s;
+  width: 0%;
+}
+
+.score-verdict {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+/* Tab switcher */
+.tab-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  background: var(--color-background-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 3px;
+}
+
+.tab-btn {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 4px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.tab-btn.active {
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+}
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.reset-btn {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  text-decoration: underline;
+}
+
+.reset-btn:hover { color: var(--color-text-secondary); }
+
+.verdict-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+</style>
+
+<div class="sys-wrap">
+
+  <!-- Framework -->
+  <div class="section-label">Your 3-timeframe framework</div>
+  <div class="tier-row">
+    <div class="tier-card">
+      <div class="t-label">Tier 1 — Bias</div>
+      <div class="t-title">Weekly / Daily</div>
+      <div class="t-sub">HTF trend direction + key supply & demand zones</div>
+      <span class="badge badge-blue">Direction only</span>
+    </div>
+    <div class="tier-card">
+      <div class="t-label">Tier 2 — Structure</div>
+      <div class="t-title">4H / 1H</div>
+      <div class="t-sub">BOS / CHoCH confirmation + liquidity sweep validation</div>
+      <span class="badge badge-amber">Confluence check</span>
+    </div>
+    <div class="tier-card">
+      <div class="t-label">Tier 3 — Entry</div>
+      <div class="t-title">15M / 5M</div>
+      <div class="t-sub">Precision entry trigger after all confluences confirmed</div>
+      <span class="badge badge-green">Entry only</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Tabs -->
+  <div class="tab-row">
+    <button class="tab-btn active" onclick="switchTab('checklist')">Trade checklist</button>
+    <button class="tab-btn" onclick="switchTab('confluences')">Confluence guide</button>
+    <button class="tab-btn" onclick="switchTab('rules')">Hard rules</button>
+  </div>
+
+  <!-- CHECKLIST TAB -->
+  <div class="tab-panel active" id="tab-checklist">
+
+    <!-- Score bar -->
+    <div class="score-wrap">
+      <div class="score-num" id="score-num">0<span style="font-size:18px;color:var(--color-text-tertiary)">/12</span></div>
+      <div class="score-right">
+        <div class="score-bar-bg"><div class="score-bar-fill" id="score-bar"></div></div>
+        <div class="verdict-row">
+          <span class="score-verdict" id="score-verdict">Tick off your confluences</span>
+          <button class="reset-btn" onclick="resetAll()">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="checklist">
+
+      <div class="check-group">
+        <div class="check-group-title">Tier 1 · HTF bias (Weekly / Daily)</div>
+        <label class="check-item" onclick="toggle(this)">
+          <div class="check-box"><div class="check-tick"></div></div>
+          <div><div class="check-text">HTF supply or demand zone identified</div><div class="check-sub">Weekly or Daily — must be a clear, unmitigated zone</div></div>
+        </label>
+        <label class="check-item" onclick="toggle(this)">
+          <div class="check-box"><div class="check-tick"></div></div>
+          <div><div class="check-text">Bias confirmed (bullish or bearish)</div><div class="check-sub">Only take demand in uptrend, supply in downtrend</div></div>
+        </label>
+        <label class="check-item" onclick="toggle(this)">
+          <div class="check-box"><div class="check-tick"></div></div>
+          <div><div class="check-text">Price is at a premium or discount</div><div class="check-sub">Sell at premium (above 50%), buy at discount (below 50%)</div></div>
+        </label>
+      </div>
+
+      <div class="check-group">
+        <div class="check-group-title">Tier 2 · Structure & confluences (4H / 1H)</div>
+        <label class="check-item" onclick="toggle(this)">
+          <div class="check-box"><div class="check-tick"></div></div>
+          <div><div class="check-text">BOS or CHoCH confirmed on 4H or 1H</div><div class="check-sub">Structure must shift in your trade direction</div></div>
+        </label>
+        <label class="check-item" onclick="toggle(this)">
+          <div class="check-box"><div class="check-tick"></div></div>
+          <div><div class="check-text">Liquidity sweep before reversal</div><div class="check-sub">Stop hunt above/below equal highs or lows</div></div>
+        </label>
+        <label class="check-item" onclick="toggle(this)">
+          <div class="check-box"><div class="check-tick"></div></div>
+          <div><div class="check-text">Fair Value Gap (FVG) aligning with zone</div><div class="check-sub">Imbalance inside or near your S&D zone adds weight</div></div>
+        </label>
+        <label class="check-item" onclick="toggle(this)">
+          <div class="check-box"><div class="check-tick"></div></div>
+          <div><div class="check-text">1H S&D zone nested inside HTF zone</div><div class="check-sub">Nested zones = higher probability reversal area</div></div>
+        </label>
+        <label class="check-item" onclick="toggle(this)">
+          <div class="check-box"><div class="check-tick"></div></div>
+          <div><div class="check-text">Fibonacci 61.8–78.6% aligns with zone</div><div class="check-sub">Draw fib from last major swing to current move</div></div>
+        </label>
+      </div>
+
+      <div class="check-group">
+        <div class="check-group-title">Tier 3 · Entry trigger (15M / 5M)</div>
+        <label class="check-item" onclick="toggle(this)">
+          <div class="check-box"><div class="check-tick"></div></div>
+          <div><div class="check-text">Entry is during a kill zone session</div><div class="check-sub">London (8–10am), NY (7–10am or 2–5pm GMT)</div></div>
+        </label>
+        <label class="check-item" onclick="toggle(this)">
+          <div class="check-box"><div class="check-tick"></div></div>
+          <div><div class="check-text">Rejection candle at zone (engulfing / pin bar)</div><div class="check-sub">Must close back outside the zone body</div></div>
+        </label>
+        <label class="check-item" onclick="toggle(this)">
+          <div class="check-box"><div class="check-tick"></div></div>
+          <div><div class="check-text">5M BOS or CHoCH confirms entry direction</div><div class="check-sub">Lower timeframe structure flip = final trigger</div></div>
+        </label>
+        <label class="check-item" onclick="toggle(this)">
+          <div class="check-box"><div class="check-tick"></div></div>
+          <div><div class="check-text">RR is at least 1:2 (target next HTF level)</div><div class="check-sub">SL behind zone, TP at next supply or demand</div></div>
+        </label>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CONFLUENCES GUIDE TAB -->
+  <div class="tab-panel" id="tab-confluences">
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="tier-card">
+        <div class="t-title">Liquidity sweeps</div>
+        <div class="t-sub" style="margin-top:4px;">Price hunts stops above equal highs or below equal lows, then reverses. Look for this <em>just before</em> price enters your zone. A sweep + zone = very high probability.</div>
+      </div>
+      <div class="tier-card">
+        <div class="t-title">BOS / CHoCH</div>
+        <div class="t-sub" style="margin-top:4px;">Break of Structure confirms trend continuation. Change of Character (CHoCH) signals a potential reversal. On 4H/1H it filters direction. On 5M it triggers entry.</div>
+      </div>
+      <div class="tier-card">
+        <div class="t-title">Fair Value Gaps (FVG)</div>
+        <div class="t-sub" style="margin-top:4px;">A 3-candle imbalance where price moves too fast to fill orders. When an FVG overlaps your zone, it creates a magnet — institutions tend to fill it before continuation.</div>
+      </div>
+      <div class="tier-card">
+        <div class="t-title">Kill zones (sessions)</div>
+        <div class="t-sub" style="margin-top:4px;">London open (8–10am GMT) and NY open (7–10am GMT) are when big money moves. Trades taken outside kill zones on GU, GJ, EU, XAUUSD, US100 have lower probability.</div>
+      </div>
+      <div class="tier-card">
+        <div class="t-title">Fibonacci (61.8–78.6%)</div>
+        <div class="t-sub" style="margin-top:4px;">Draw from the last significant swing high to low (or reverse). When the 61.8 or 78.6 level sits inside your S&D zone, the zone is stronger. The 50% level is the premium/discount separator.</div>
+      </div>
+      <div class="tier-card">
+        <div class="t-title">Nested zones (HTF + LTF)</div>
+        <div class="t-sub" style="margin-top:4px;">A 1H demand zone inside a Daily demand zone = stacked institutional interest. This is one of the highest probability setups in your system.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HARD RULES TAB -->
+  <div class="tab-panel" id="tab-rules">
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="tier-card" style="border-left: 3px solid var(--color-text-danger); border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;">
+        <div class="t-title" style="color:var(--color-text-danger);">Do not enter below 5/12 score</div>
+        <div class="t-sub" style="margin-top:4px;">Fewer than 5 confluences means the setup is unconfirmed. Mark it on your chart and wait — don't chase.</div>
+      </div>
+      <div class="tier-card" style="border-left: 3px solid var(--color-text-danger); border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;">
+        <div class="t-title" style="color:var(--color-text-danger);">Never trade against HTF bias</div>
+        <div class="t-sub" style="margin-top:4px;">If Daily is bearish, skip all demand zone trades no matter how clean the LTF setup looks.</div>
+      </div>
+      <div class="tier-card" style="border-left: 3px solid var(--color-text-warning); border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;">
+        <div class="t-title" style="color:var(--color-text-warning);">No entry outside kill zones</div>
+        <div class="t-sub" style="margin-top:4px;">GU, GJ, EU, XAUUSD, US100 all move with London and NY sessions. Entries outside these windows have lower follow-through and wider spreads.</div>
+      </div>
+      <div class="tier-card" style="border-left: 3px solid var(--color-text-warning); border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;">
+        <div class="t-title" style="color:var(--color-text-warning);">SL must be behind the full zone</div>
+        <div class="t-sub" style="margin-top:4px;">Never put stop loss inside the zone. Place it 2–5 pips beyond the far edge of the zone body.</div>
+      </div>
+      <div class="tier-card" style="border-left: 3px solid var(--color-border-secondary); border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;">
+        <div class="t-title">Minimum RR = 1:2</div>
+        <div class="t-sub" style="margin-top:4px;">If the next HTF level doesn't give you at least 1:2, skip the trade. This protects your edge over time.</div>
+      </div>
+      <div class="tier-card" style="border-left: 3px solid var(--color-border-secondary); border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;">
+        <div class="t-title">One trade per session max (while building)</div>
+        <div class="t-sub" style="margin-top:4px;">Until this system is proven in your journal, take max one trade per session to protect your account during the learning phase.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function toggle(el) {
+  el.classList.toggle('checked');
+  updateScore();
+}
+
+function updateScore() {
+  const all = document.querySelectorAll('#tab-checklist .check-item');
+  const checked = document.querySelectorAll('#tab-checklist .check-item.checked');
+  const n = checked.length;
+  const total = all.length;
+  const pct = Math.round((n / total) * 100);
+
+  document.getElementById('score-num').innerHTML = n + '<span style="font-size:18px;color:var(--color-text-tertiary)">/' + total + '</span>';
+
+  const bar = document.getElementById('score-bar');
+  bar.style.width = pct + '%';
+
+  let color, verdict;
+  if (n >= 9) {
+    color = 'var(--color-text-success)';
+    verdict = 'A-grade setup — take the trade';
+  } else if (n >= 7) {
+    color = '#639922';
+    verdict = 'Good setup — proceed with confidence';
+  } else if (n >= 5) {
+    color = '#BA7517';
+    verdict = 'Marginal — wait for one more confluence';
+  } else {
+    color = 'var(--color-text-danger)';
+    verdict = n === 0 ? 'Tick off your confluences' : 'Too few confluences — skip this trade';
+  }
+
+  bar.style.background = color;
+  document.getElementById('score-verdict').style.color = color;
+  document.getElementById('score-verdict').textContent = verdict;
+}
+
+function resetAll() {
+  document.querySelectorAll('.check-item.checked').forEach(el => el.classList.remove('checked'));
+  updateScore();
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', b.getAttribute('onclick').includes(name));
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'tab-' + name);
+  });
+}
+</script>

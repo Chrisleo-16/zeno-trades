@@ -68,7 +68,76 @@ type EventKnowledge = {
   missBias:    'bullish' | 'bearish';
   explanation: string;
 };
+// ─── Add these new types at the top with your other types ───
+type MarketSummary = {
+  symbol: string;
+  change: number;
+  changePct: number;
+  latestPrice: string;
+  prevClose: string;
+  status: 'open' | 'closed' | 'premarket' | 'afterhours';
+};
 
+// ─── Add this hook right before your main component ───
+function useMarketSummary() {
+  const [summary, setSummary] = useState<MarketSummary | null>(null);
+  const [marketLoading, setMarketLoading] = useState(true);
+  const [marketMock, setMarketMock] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/market/daily?symbol=SPY')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data?.['Time Series (Daily)']) {
+          const series = data.data['Time Series (Daily)'];
+          const dates = Object.keys(series).sort().slice(0, 2);
+          const latest = series[dates[0]];
+          const prev = series[dates[1]];
+          
+          const latestClose = parseFloat(latest['4. close']);
+          const prevClose = parseFloat(prev['4. close']);
+          const change = latestClose - prevClose;
+          const changePct = (change / prevClose) * 100;
+
+          setSummary({
+            symbol: 'SPY',
+            latestPrice: latest['4. close'],
+            prevClose: prev['4. close'],
+            change: change,
+            changePct: changePct,
+            status: 'open'
+          });
+          setMarketMock(false);
+        } else {
+          // Mock fallback
+          setSummary({
+            symbol: 'SPY',
+            latestPrice: '523.80',
+            prevClose: '520.50',
+            change: 3.30,
+            changePct: 0.63,
+            status: 'open'
+          });
+          setMarketMock(true);
+        }
+      })
+      .catch(() => {
+        setSummary({
+          symbol: 'SPY',
+          latestPrice: '523.80',
+          prevClose: '520.50',
+          change: 3.30,
+          changePct: 0.63,
+          status: 'open'
+        });
+        setMarketMock(true);
+      })
+      .finally(() => setMarketLoading(false));
+  }, []);
+
+  return { summary, marketLoading, marketMock };
+}
+ 
 const EVENT_KB: Record<string, EventKnowledge> = {
   'Non Farm Payrolls': {
     laymans: 'How many jobs America created last month',
@@ -438,7 +507,7 @@ export default function NewsPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selected, setSelected]     = useState<CalendarEvent | null>(null);
   const [filter, setFilter]         = useState<Impact | 'all'>('all');
-
+  const { summary, marketLoading, marketMock } = useMarketSummary();
   const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
   const fetchCalendar = useCallback(async (date: Date) => {
@@ -536,7 +605,86 @@ export default function NewsPage() {
           </div>
         </motion.div>
       )}
+      {/* ── NEW: Market Summary Section ── */}
+      <div className="space-y-4">
+        {/* Market status bar */}
+        <div className="flex items-center justify-between p-4 rounded-2xl"
+          style={{ 
+            background: marketMock 
+              ? 'rgba(245,158,11,0.07)' 
+              : summary?.changePct && summary.changePct > 0 
+                ? 'rgba(0,255,135,0.08)' 
+                : 'rgba(239,68,68,0.08)',
+            border: `1px solid ${marketMock ? 'rgba(245,158,11,0.2)' : summary?.changePct && summary.changePct > 0 ? 'rgba(0,255,135,0.2)' : 'rgba(239,68,68,0.2)'}`
+          }}>
+          
+          {marketLoading ? (
+            <div className="flex items-center gap-3 w-full">
+              <div className="w-8 h-8 bg-white/5 rounded-xl animate-pulse" />
+              <div className="flex-1 space-y-1">
+                <div className="h-4 bg-white/10 rounded w-24 animate-pulse" />
+                <div className="h-3 bg-white/5 rounded w-16 animate-pulse" />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full animate-ping"
+                  style={{ backgroundColor: summary?.changePct && summary.changePct > 0 ? '#00ff87' : '#ef4444' }} />
+                <div>
+                  <p className="text-sm font-bold text-white/80" style={{ fontFamily: "'DM Mono',monospace" }}>
+                    S&P 500 {summary?.status.toUpperCase()}
+                  </p>
+                  <p className="text-2xl font-black" 
+                    style={{ 
+                      color: summary?.changePct && summary.changePct > 0 ? '#00ff87' : '#ef4444',
+                      fontFamily: "'DM Mono',monospace"
+                    }}>
+                    ${summary?.latestPrice}
+                  </p>
+                </div>
+              </div>
 
+              <div className="text-center">
+                <p className={`text-sm font-bold ${summary?.changePct && summary.changePct > 0 ? 'text-[#00ff87]' : 'text-[#ef4444]'} font-mono`}>
+                  {summary?.changePct! > 0 ? '+' : ''}{summary?.changePct?.toFixed(2)}%
+                </p>
+                <p className="text-xs text-white/40" style={{ fontFamily: "'DM Mono',monospace" }}>
+                  {summary?.change! > 0 ? '+' : ''}{summary?.change?.toFixed(2)} pts
+                </p>
+              </div>
+
+              {marketMock && (
+                <div className="ml-auto text-xs text-amber-400 font-mono" style={{ fontFamily: "'DM Mono',monospace" }}>
+                  DEMO
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Quick market context */}
+        {!marketLoading && summary && (
+          <div className="text-xs p-3 rounded-xl grid grid-cols-2 gap-2 text-center"
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div>
+              <p className="text-white/40 mb-1" style={{ fontFamily: "'DM Mono',monospace" }}>Market direction</p>
+              <p style={{ 
+                color: summary.changePct > 0 ? '#00ff87' : '#ef4444',
+                fontFamily: "'DM Mono',monospace", fontWeight: 'bold'
+              }}>
+                {summary.changePct > 0 ? 'BULLISH' : 'BEARISH'}
+              </p>
+            </div>
+            <div>
+              <p className="text-white/40 mb-1" style={{ fontFamily: "'DM Mono',monospace" }}>Trading</p>
+              <p className="text-[#00ff87] font-bold" style={{ fontFamily: "'DM Mono',monospace" }}>
+                {summary.status.toUpperCase()}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
       {/* ── Date navigator ── */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">

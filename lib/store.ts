@@ -1,418 +1,653 @@
-// lib/store.ts
-// Trading Journal Data Store with localStorage persistence
-
-export type TradeStatus = 'pending' | 'win' | 'loss' | 'breakeven';
-export type SessionType = 'london' | 'newyork' | 'tokyo' | 'sydney';
-export type DisciplineViolation = 'no-checklist' | 'wrong-size' | 'revenge-trade' | 'no-plan' | 'emotional';
-export type TradeRating = 1 | 2 | 3 | 4 | 5;
-
-// ─── Tag types ───────────────────────────────────────────────────────────────
-
-export type TradeTag = {
-  id: string;
-  label: string;
-  category: 'setup' | 'mistake' | 'custom';
-  color: string;
-};
-
-export const DEFAULT_TAGS: TradeTag[] = [
-  // Setups
-  { id: 'london-breakout', label: 'London Breakout',  category: 'setup',   color: '#00ff87' },
-  { id: 'ny-open',         label: 'NY Open',          category: 'setup',   color: '#60a5fa' },
-  { id: 'trend-follow',    label: 'Trend Follow',     category: 'setup',   color: '#a78bfa' },
-  { id: 'reversal',        label: 'Reversal',         category: 'setup',   color: '#f59e0b' },
-  { id: 'range-break',     label: 'Range Break',      category: 'setup',   color: '#f472b6' },
-  { id: 'news-play',       label: 'News Play',        category: 'setup',   color: '#fb923c' },
-  // Mistakes
-  { id: 'revenge-trade',   label: 'Revenge Trade',    category: 'mistake', color: '#ef4444' },
-  { id: 'fomo',            label: 'FOMO',             category: 'mistake', color: '#ef4444' },
-  { id: 'early-exit',      label: 'Early Exit',       category: 'mistake', color: '#ef4444' },
-  { id: 'late-entry',      label: 'Late Entry',       category: 'mistake', color: '#f97316' },
-  { id: 'no-stop',         label: 'No Stop Loss',     category: 'mistake', color: '#f97316' },
-  { id: 'oversized',       label: 'Oversized',        category: 'mistake', color: '#f97316' },
-];
-
-// ─── Core types ───────────────────────────────────────────────────────────────
+// lib/store.ts - Main data store with localStorage fallback and Supabase sync
 
 export interface Trade {
-  id: string;
-  date: string;
-  entryTime: string;
-  exitTime?: string;
-  pair: string;
-  type: 'long' | 'short';
-  entryPrice: number;
-  exitPrice?: number;
-  quantity: number;
-  pnl?: number;
-  status: TradeStatus;
+  id: string
+  user_id: string
+  pair: string
+  type: 'buy' | 'sell' | 'long' | 'short'
+  status: 'win' | 'loss' | 'breakeven' | 'pending' | 'open'
+  entry_price: number
+  entryPrice?: number // Legacy support
+  exit_price?: number
+  exitPrice?: number // Legacy support
+  stop_loss?: number
+  take_profit?: number
+  pnl?: number
+  size: number
+  date: string
+  session: string
+  entry_time?: string
+  emotional_state: string
+  strategy?: string
+  violations?: string[]
+  notes?: string
+  tags?: string[]
+  rating?: 1 | 2 | 3 | 4 | 5
+  reviewed: boolean
+  commission?: number
+  screenshots?: string[]
+  setup_notes?: string
+  review_notes?: string
+  risk_amount?: number
+  r_multiple?: number
+  rMultiple?: number // Legacy support
+  created_at: string
+  updated_at: string
+}
 
-  // Original fields
-  tags: string[];           // tag ids from DEFAULT_TAGS or custom tags
-  notes: string;
-  checklistCompleted: boolean;
-  violations: DisciplineViolation[];
-  strategyUsed: string;
-  emotionalState: 'calm' | 'excited' | 'frustrated' | 'fearful';
-  sessionType: SessionType;
+export type TradeStatus = 'win' | 'loss' | 'breakeven' | 'pending' | 'open'
 
-  // ── Extended (Tradezella-style) fields ────────────────────────────────────
-  rating?: TradeRating;     // 1–5 execution quality score
-  reviewed?: boolean;       // has user written a post-trade review
-  commission?: number;      // fees/spread cost in $
-  riskAmount?: number;      // $ amount risked on this trade
-  rMultiple?: number;       // pnl / riskAmount — auto-calculated on save
-  reviewNotes?: string;     // post-trade review text
-  setupNotes?: string;      // pre-trade plan/notes
+export interface TradeTag {
+  id: string
+  label: string
+  category: 'setup' | 'mistake' | 'custom'
+  color: string
 }
 
 export interface Strategy {
-  id: string;
-  name: string;
-  description: string;
-  rules: string[];
-  timeframe: string;
-  targetPair: string;
-  riskReward: string;
-  winRate: number;
-  trades: number;
-  personalizedFor: string;
-  category: 'scalping' | 'swing' | 'day' | 'position';
+  id: string
+  user_id: string
+  name: string
+  description: string
+  rules: string[]
+  risk_level: 'low' | 'medium' | 'high'
+  confidence: number
+  active: boolean
+  created_at: string
+  updated_at: string
 }
 
-export interface LearningModule {
-  id: string;
-  type: 'guide' | 'case-study' | 'psychology' | 'video';
-  title: string;
-  description: string;
-  content: string;
-  duration: string;
-  completed: boolean;
-  strategy?: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+export interface UserAnalytics {
+  id: string
+  user_id: string
+  total_trades: number
+  win_rate: number
+  total_pnl: number
+  max_drawdown: number
+  current_drawdown: number
+  consecutive_wins: number
+  consecutive_losses: number
+  avg_win: number
+  avg_loss: number
+  profit_factor: number
+  sharpe_ratio?: number
+  updated_at: string
 }
 
 export interface UserProfile {
-  id: string;
-  name: string;
-  email: string;
-  tradingStyle: string;
-  experience: string;
-  riskTolerance: string;
-  preferredSession: SessionType;
-  targetAccount: number;
-  createdAt: string;
-  startingBalance?: number; // used for drawdown calculation
+  id: string
+  user_id: string
+  name: string
+  email: string
+  trading_style?: string
+  experience?: string
+  risk_tolerance?: string
+  preferred_session: 'london' | 'newyork' | 'tokyo' | 'sydney'
+  target_account: number
+  created_at: string
+  updated_at: string
 }
 
-// ─── Calendar & Drawdown types ────────────────────────────────────────────────
+export interface DrawdownStats {
+  max_drawdown: number
+  current_drawdown: number
+  drawdown_periods: number
+  recovery_time: number
+  maxDrawdownDollar?: number
+  maxDrawdownPercent?: number
+  maxDrawdownDate?: string
+  maxConsecutiveLosses?: number
+  currentConsecutiveLosses?: number
+}
 
-export type DayStats = {
-  date: string;
-  pnl: number;
-  tradeCount: number;
-  winCount: number;
-};
+export interface DayStats {
+  date: string
+  trades: number
+  pnl: number
+  win_rate: number
+  max_drawdown: number
+  tradeCount?: number
+  winCount?: number
+}
 
-export type DrawdownStats = {
-  maxDrawdownDollar: number;
-  maxDrawdownPercent: number;
-  maxDrawdownDate: string;
-  maxConsecutiveLosses: number;
-  currentConsecutiveLosses: number;
-  currentDrawdownFromPeak: number;
-};
+export interface LearningModule {
+  id: string
+  type: 'psychology' | 'strategy' | 'risk' | 'technical'
+  title: string
+  description: string
+  content: string
+  duration: number
+  difficulty: 'beginner' | 'intermediate' | 'advanced'
+  prerequisites?: string[]
+  tags?: string[]
+  created_at: string
+  updated_at: string
+}
 
-// ─── Storage keys ─────────────────────────────────────────────────────────────
+// Store keys
+const TRADES_KEY = 'zeno_trades'
+const STRATEGIES_KEY = 'zeno_strategies'
+const ANALYTICS_KEY = 'zeno_analytics'
+const TAGS_KEY = 'zeno_tags'
+const PROFILE_KEY = 'zeno_profile'
 
-const STORAGE_KEYS = {
-  TRADES:     'sniper_trades',
-  STRATEGIES: 'sniper_strategies',
-  MODULES:    'sniper_modules',
-  PROFILE:    'sniper_profile',
-  TAGS:       'sniper_tags',
-};
+// Base store class
+abstract class BaseStore<T> {
+  protected key: string
+  
+  constructor(key: string) {
+    this.key = key
+  }
 
-// ─── Profile store ────────────────────────────────────────────────────────────
+  protected isClient(): boolean {
+    return typeof window !== 'undefined'
+  }
 
-export const profileStore = {
-  get: (): UserProfile | null => {
-    if (typeof window === 'undefined') return null;
-    const data = localStorage.getItem(STORAGE_KEYS.PROFILE);
-    return data ? JSON.parse(data) : null;
-  },
-  set: (profile: UserProfile) => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
-  },
-};
-
-// ─── Tags store ───────────────────────────────────────────────────────────────
-
-export const tagsStore = {
-  getAll(): TradeTag[] {
-    if (typeof window === 'undefined') return DEFAULT_TAGS;
+  protected getFromStorage(): T[] {
+    if (!this.isClient()) return []
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.TAGS);
-      return raw ? JSON.parse(raw) : DEFAULT_TAGS;
+      const raw = localStorage.getItem(this.key)
+      return raw ? JSON.parse(raw) : []
     } catch {
-      return DEFAULT_TAGS;
+      return []
     }
-  },
-  add(tag: TradeTag): void {
-    if (typeof window === 'undefined') return;
-    const tags = this.getAll();
-    tags.push(tag);
-    localStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(tags));
-  },
-  delete(id: string): void {
-    if (typeof window === 'undefined') return;
-    const tags = this.getAll().filter((t) => t.id !== id);
-    localStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(tags));
-  },
-};
+  }
 
-// ─── Trades store ─────────────────────────────────────────────────────────────
+  protected saveToStorage(data: T[]): void {
+    if (!this.isClient()) return
+    try {
+      localStorage.setItem(this.key, JSON.stringify(data))
+    } catch {
+      // Silently fail for read-only mode
+    }
+  }
 
-export const tradesStore = {
-  getAll: (): Trade[] => {
-    if (typeof window === 'undefined') return [];
-    const data = localStorage.getItem(STORAGE_KEYS.TRADES);
-    return data ? JSON.parse(data) : [];
-  },
+  abstract getAll(): T[]
+  abstract add(item: Omit<T, 'id' | 'created_at' | 'updated_at'>): T
+  abstract update(id: string, updates: Partial<T>): T | null
+  abstract delete(id: string): boolean
+}
 
-  add: (trade: Trade) => {
+// Trades Store
+export class TradesStore extends BaseStore<Trade> {
+  constructor() {
+    super(TRADES_KEY)
+  }
+
+  getAll(): Trade[] {
+    return this.getFromStorage()
+  }
+
+  add(tradeData: Omit<Trade, 'id' | 'created_at' | 'updated_at'>): Trade {
+    const trade: Trade = {
+      ...tradeData,
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    
+    const trades = this.getAll()
+    trades.push(trade)
+    this.saveToStorage(trades)
+    
+    return trade
+  }
+
+  update(id: string, updates: Partial<Trade>): Trade | null {
+    const trades = this.getAll()
+    const index = trades.findIndex(t => t.id === id)
+    
+    if (index === -1) return null
+    
+    trades[index] = {
+      ...trades[index],
+      ...updates,
+      updated_at: new Date().toISOString(),
+    }
+    
+    this.saveToStorage(trades)
+    return trades[index]
+  }
+
+  delete(id: string): boolean {
+    const trades = this.getAll()
+    const filtered = trades.filter(t => t.id !== id)
+    
+    if (filtered.length === trades.length) return false
+    
+    this.saveToStorage(filtered)
+    return true
+  }
+
+  getByDateRange(startDate: string, endDate: string): Trade[] {
+    return this.getAll().filter(trade => 
+      trade.date >= startDate && trade.date <= endDate
+    )
+  }
+
+  getByPair(pair: string): Trade[] {
+    return this.getAll().filter(trade => trade.pair === pair)
+  }
+
+  getWinRate(): number {
+    const trades = this.getAll()
+    if (trades.length === 0) return 0
+    const wins = trades.filter(t => t.status === 'win').length
+    return (wins / trades.length) * 100
+  }
+
+  getTotalPnL(): number {
+    return this.getAll().reduce((sum, trade) => sum + (trade.pnl || 0), 0)
+  }
+}
+
+// Strategies Store
+export class StrategiesStore extends BaseStore<Strategy> {
+  constructor() {
+    super(STRATEGIES_KEY)
+  }
+
+  getAll(): Strategy[] {
+    return this.getFromStorage()
+  }
+
+  add(strategyData: Omit<Strategy, 'id' | 'created_at' | 'updated_at'>): Strategy {
+    const strategy: Strategy = {
+      ...strategyData,
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    
+    const strategies = this.getAll()
+    strategies.push(strategy)
+    this.saveToStorage(strategies)
+    
+    return strategy
+  }
+
+  update(id: string, updates: Partial<Strategy>): Strategy | null {
+    const strategies = this.getAll()
+    const index = strategies.findIndex(s => s.id === id)
+    
+    if (index === -1) return null
+    
+    strategies[index] = {
+      ...strategies[index],
+      ...updates,
+      updated_at: new Date().toISOString(),
+    }
+    
+    this.saveToStorage(strategies)
+    return strategies[index]
+  }
+
+  delete(id: string): boolean {
+    const strategies = this.getAll()
+    const filtered = strategies.filter(s => s.id !== id)
+    
+    if (filtered.length === strategies.length) return false
+    
+    this.saveToStorage(filtered)
+    return true
+  }
+
+  getActive(): Strategy[] {
+    return this.getAll().filter(s => s.active)
+  }
+}
+
+// Tags Store
+export class TagsStore extends BaseStore<TradeTag> {
+  constructor() {
+    super(TAGS_KEY)
+  }
+
+  getAll(): TradeTag[] {
+    return this.getFromStorage()
+  }
+
+  add(tagData: Omit<TradeTag, 'id'>): TradeTag {
+    const tag: TradeTag = {
+      ...tagData,
+      id: crypto.randomUUID(),
+    }
+    
+    const tags = this.getAll()
+    tags.push(tag)
+    this.saveToStorage(tags)
+    
+    return tag
+  }
+
+  update(id: string, updates: Partial<TradeTag>): TradeTag | null {
+    const tags = this.getAll()
+    const index = tags.findIndex(t => t.id === id)
+    
+    if (index === -1) return null
+    
+    tags[index] = { ...tags[index], ...updates }
+    this.saveToStorage(tags)
+    return tags[index]
+  }
+
+  delete(id: string): boolean {
+    const tags = this.getAll()
+    const filtered = tags.filter(t => t.id !== id)
+    
+    if (filtered.length === tags.length) return false
+    
+    this.saveToStorage(filtered)
+    return true
+  }
+}
+
+// Modules Store
+export class ModulesStore extends BaseStore<LearningModule> {
+  constructor() {
+    super('zeno_modules')
+  }
+
+  getAll(): LearningModule[] {
+    return this.getFromStorage()
+  }
+
+  add(moduleData: Omit<LearningModule, 'id' | 'created_at' | 'updated_at'>): LearningModule {
+    const module: LearningModule = {
+      ...moduleData,
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    
+    const modules = this.getAll()
+    modules.push(module)
+    this.saveToStorage(modules)
+    
+    return module
+  }
+
+  update(id: string, updates: Partial<LearningModule>): LearningModule | null {
+    const modules = this.getAll()
+    const index = modules.findIndex(m => m.id === id)
+    
+    if (index === -1) return null
+    
+    modules[index] = {
+      ...modules[index],
+      ...updates,
+      updated_at: new Date().toISOString(),
+    }
+    
+    this.saveToStorage(modules)
+    return modules[index]
+  }
+
+  delete(id: string): boolean {
+    const modules = this.getAll()
+    const filtered = modules.filter(m => m.id !== id)
+    
+    if (filtered.length === modules.length) return false
+    
+    this.saveToStorage(filtered)
+    return true
+  }
+
+  getByType(type: LearningModule['type']): LearningModule[] {
+    return this.getAll().filter(m => m.type === type)
+  }
+
+  getCompleted(): LearningModule[] {
+    return this.getAll().filter(m => m.tags?.includes('completed'))
+  }
+}
+
+// Profile Store (singleton pattern - different from BaseStore)
+export class ProfileStore {
+  private static instance: ProfileStore;
+  private profile: UserProfile | null = null;
+  private readonly PROFILE_KEY = 'zeno_profile';
+
+  private constructor() {
+    this.loadFromStorage();
+  }
+
+  static getInstance(): ProfileStore {
+    if (!ProfileStore.instance) {
+      ProfileStore.instance = new ProfileStore();
+    }
+    return ProfileStore.instance;
+  }
+
+  private loadFromStorage(): void {
     if (typeof window === 'undefined') return;
-    // Auto-calculate R-multiple if riskAmount provided
-    const enriched: Trade = {
-      ...trade,
-      rMultiple:
-        trade.riskAmount && trade.riskAmount > 0 && trade.pnl != null
-          ? parseFloat((trade.pnl / trade.riskAmount).toFixed(2))
-          : trade.rMultiple,
-      reviewed: trade.reviewed ?? false,
-      tags: trade.tags ?? [],
-    };
-    const trades = tradesStore.getAll();
-    trades.push(enriched);
-    localStorage.setItem(STORAGE_KEYS.TRADES, JSON.stringify(trades));
-  },
-
-  update: (id: string, updates: Partial<Trade>) => {
-    if (typeof window === 'undefined') return;
-    const trades = tradesStore.getAll();
-    const index = trades.findIndex((t) => t.id === id);
-    if (index !== -1) {
-      const merged = { ...trades[index], ...updates };
-      // Recalculate R-multiple on update if risk info present
-      if (merged.riskAmount && merged.riskAmount > 0 && merged.pnl != null) {
-        merged.rMultiple = parseFloat((merged.pnl / merged.riskAmount).toFixed(2));
+    try {
+      const stored = localStorage.getItem(this.PROFILE_KEY);
+      if (stored) {
+        this.profile = JSON.parse(stored);
       }
-      trades[index] = merged;
-      localStorage.setItem(STORAGE_KEYS.TRADES, JSON.stringify(trades));
+    } catch {
+      // Silently fail
     }
-  },
+  }
 
-  delete: (id: string) => {
-    if (typeof window === 'undefined') return;
-    const trades = tradesStore.getAll().filter((t) => t.id !== id);
-    localStorage.setItem(STORAGE_KEYS.TRADES, JSON.stringify(trades));
-  },
-};
-
-// ─── Strategies store ─────────────────────────────────────────────────────────
-
-export const strategiesStore = {
-  getAll: (): Strategy[] => {
-    if (typeof window === 'undefined') return [];
-    const data = localStorage.getItem(STORAGE_KEYS.STRATEGIES);
-    return data ? JSON.parse(data) : [];
-  },
-  add: (strategy: Strategy) => {
-    if (typeof window === 'undefined') return;
-    const strategies = strategiesStore.getAll();
-    strategies.push(strategy);
-    localStorage.setItem(STORAGE_KEYS.STRATEGIES, JSON.stringify(strategies));
-  },
-  update: (id: string, updates: Partial<Strategy>) => {
-    if (typeof window === 'undefined') return;
-    const strategies = strategiesStore.getAll();
-    const index = strategies.findIndex((s) => s.id === id);
-    if (index !== -1) {
-      strategies[index] = { ...strategies[index], ...updates };
-      localStorage.setItem(STORAGE_KEYS.STRATEGIES, JSON.stringify(strategies));
+  private saveToStorage(): void {
+    if (typeof window === 'undefined' || !this.profile) return;
+    try {
+      localStorage.setItem(this.PROFILE_KEY, JSON.stringify(this.profile));
+    } catch {
+      // Silently fail
     }
-  },
-};
+  }
 
-// ─── Modules store ────────────────────────────────────────────────────────────
+  get(): UserProfile | null {
+    return this.profile;
+  }
 
-export const modulesStore = {
-  getAll: (): LearningModule[] => {
-    if (typeof window === 'undefined') return [];
-    const data = localStorage.getItem(STORAGE_KEYS.MODULES);
-    return data ? JSON.parse(data) : [];
-  },
-  add: (module: LearningModule) => {
-    if (typeof window === 'undefined') return;
-    const modules = modulesStore.getAll();
-    modules.push(module);
-    localStorage.setItem(STORAGE_KEYS.MODULES, JSON.stringify(modules));
-  },
-  markComplete: (id: string) => {
-    if (typeof window === 'undefined') return;
-    const modules = modulesStore.getAll();
-    const index = modules.findIndex((m) => m.id === id);
-    if (index !== -1) {
-      modules[index].completed = true;
-      localStorage.setItem(STORAGE_KEYS.MODULES, JSON.stringify(modules));
+  set(profile: UserProfile): void {
+    this.profile = { ...profile, updated_at: new Date().toISOString() };
+    this.saveToStorage();
+  }
+
+  update(updates: Partial<UserProfile>): UserProfile | null {
+    if (!this.profile) return null;
+    this.profile = { ...this.profile, ...updates, updated_at: new Date().toISOString() };
+    this.saveToStorage();
+    return this.profile;
+  }
+
+  clear(): void {
+    this.profile = null;
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(this.PROFILE_KEY);
     }
-  },
-};
+  }
+}
 
-// ─── Analytics store ──────────────────────────────────────────────────────────
+// Analytics Store (calculated from trades)
+export class AnalyticsStore {
+  private tradesStore: TradesStore
 
-export const analyticsStore = {
-  getWinRate: (): number => {
-    const trades = tradesStore.getAll();
-    if (trades.length === 0) return 0;
-    const wins = trades.filter((t) => t.status === 'win').length;
-    return (wins / trades.length) * 100;
-  },
+  constructor(tradesStore: TradesStore) {
+    this.tradesStore = tradesStore
+  }
 
-  getTotalPnL: (): number => {
-    return tradesStore.getAll().reduce((sum, t) => sum + (t.pnl || 0), 0);
-  },
+  calculate(): UserAnalytics {
+    const trades = this.tradesStore.getAll()
+    const wins = trades.filter(t => t.status === 'win')
+    const losses = trades.filter(t => t.status === 'loss')
+    
+    const totalPnL = trades.reduce((sum, t) => sum + (t.pnl || 0), 0)
+    const totalRisked = trades.reduce((sum, t) => sum + (t.risk_amount || 0), 0)
+    
+    const winRate = trades.length > 0 ? (wins.length / trades.length) * 100 : 0
+    const avgWin = wins.length > 0 ? wins.reduce((sum, t) => sum + (t.pnl || 0), 0) / wins.length : 0
+    const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((sum, t) => sum + (t.pnl || 0), 0) / losses.length) : 0
+    
+    const profitFactor = avgLoss > 0 ? avgWin / avgLoss : 0
+    
+    return {
+      id: crypto.randomUUID(),
+      user_id: 'current_user', // This would come from auth
+      total_trades: trades.length,
+      win_rate: winRate,
+      total_pnl: totalPnL,
+      max_drawdown: 0, // Would need more complex calculation
+      current_drawdown: 0, // Would need more complex calculation
+      consecutive_wins: 0, // Would need calculation
+      consecutive_losses: 0, // Would need calculation
+      avg_win: avgWin,
+      avg_loss: avgLoss,
+      profit_factor: profitFactor,
+      sharpe_ratio: 0, // Would need risk-free rate and periods
+      updated_at: new Date().toISOString(),
+    }
+  }
 
-  getDisciplineScore: (): number => {
-    const trades = tradesStore.getAll();
-    if (trades.length === 0) return 100;
-    const violatingTrades = trades.filter((t) => t.violations.length > 0).length;
-    return Math.max(0, 100 - (violatingTrades / trades.length) * 50);
-  },
+  getWinRate(): number {
+    return this.calculate().win_rate
+  }
 
-  getTradesByPair: (): Record<string, number> => {
-    const trades = tradesStore.getAll();
-    return trades.reduce((acc, t) => {
-      acc[t.pair] = (acc[t.pair] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-  },
+  getTotalPnL(): number {
+    return this.calculate().total_pnl
+  }
 
-  // ── New helpers ─────────────────────────────────────────────────────────────
+  getDisciplineScore(): number {
+    // Simple calculation based on violations
+    const trades = this.tradesStore.getAll()
+    if (trades.length === 0) return 100
 
-  getProfitFactor: (): number => {
-    const trades = tradesStore.getAll();
-    const grossProfit = trades.filter((t) => (t.pnl ?? 0) > 0).reduce((s, t) => s + (t.pnl ?? 0), 0);
-    const grossLoss   = Math.abs(trades.filter((t) => (t.pnl ?? 0) < 0).reduce((s, t) => s + (t.pnl ?? 0), 0));
-    return grossLoss === 0 ? grossProfit > 0 ? 999 : 0 : parseFloat((grossProfit / grossLoss).toFixed(2));
-  },
+    const tradesWithViolations = trades.filter(t =>
+      t.violations && t.violations.length > 0
+    ).length
 
-  getAvgWin: (): number => {
-    const wins = tradesStore.getAll().filter((t) => (t.pnl ?? 0) > 0);
-    if (wins.length === 0) return 0;
-    return wins.reduce((s, t) => s + (t.pnl ?? 0), 0) / wins.length;
-  },
+    const violationRate = tradesWithViolations / trades.length
+    return Math.max(0, 100 - (violationRate * 100))
+  }
 
-  getAvgLoss: (): number => {
-    const losses = tradesStore.getAll().filter((t) => (t.pnl ?? 0) < 0);
-    if (losses.length === 0) return 0;
-    return losses.reduce((s, t) => s + (t.pnl ?? 0), 0) / losses.length;
-  },
+  getTradesByPair(): Record<string, number> {
+    const trades = this.tradesStore.getAll()
+    const pairCount: Record<string, number> = {}
+    
+    trades.forEach(trade => {
+      pairCount[trade.pair] = (pairCount[trade.pair] || 0) + 1
+    })
+    
+    return pairCount
+  }
 
-  getTradesByTag: (): Record<string, { count: number; pnl: number; wins: number }> => {
-    const trades = tradesStore.getAll();
-    const result: Record<string, { count: number; pnl: number; wins: number }> = {};
-    trades.forEach((t) => {
-      (t.tags ?? []).forEach((tagId) => {
-        if (!result[tagId]) result[tagId] = { count: 0, pnl: 0, wins: 0 };
-        result[tagId].count += 1;
-        result[tagId].pnl   += t.pnl ?? 0;
-        if (t.status === 'win') result[tagId].wins += 1;
-      });
-    });
-    return result;
-  },
-};
+  getProfitFactor(): number {
+    return this.calculate().profit_factor
+  }
 
-// ─── Drawdown calculator ─────────────────────────────────────────────────────
+  getAvgWin(): number {
+    return this.calculate().avg_win
+  }
 
-export function calcDrawdown(
-  trades: Trade[],
-  startingBalance = 10000
-): DrawdownStats {
+  getAvgLoss(): number {
+    return this.calculate().avg_loss
+  }
+
+  getTradesByTag(): Record<string, { count: number; pnl: number; wins: number }> {
+    const trades = this.tradesStore.getAll()
+    const tagStats: Record<string, { count: number; pnl: number; wins: number }> = {}
+
+    trades.forEach(trade => {
+      if (trade.tags) {
+        trade.tags.forEach(tag => {
+          if (!tagStats[tag]) {
+            tagStats[tag] = { count: 0, pnl: 0, wins: 0 }
+          }
+          tagStats[tag].count++
+          tagStats[tag].pnl += trade.pnl || 0
+          if (trade.status === 'win') {
+            tagStats[tag].wins++
+          }
+        })
+      }
+    })
+
+    return tagStats
+  }
+}
+
+// Export singleton instances
+export const tradesStore = new TradesStore()
+export const strategiesStore = new StrategiesStore()
+export const tagsStore = new TagsStore()
+export const modulesStore = new ModulesStore()
+export const analyticsStore = new AnalyticsStore(tradesStore)
+export const profileStore = ProfileStore.getInstance()
+
+// Utility functions for analytics
+export function calcDrawdown(trades: Trade[], startingBalance?: number): DrawdownStats {
   if (trades.length === 0) {
     return {
-      maxDrawdownDollar: 0,
-      maxDrawdownPercent: 0,
-      maxDrawdownDate: '',
-      maxConsecutiveLosses: 0,
-      currentConsecutiveLosses: 0,
-      currentDrawdownFromPeak: 0,
-    };
+      max_drawdown: 0,
+      current_drawdown: 0,
+      drawdown_periods: 0,
+      recovery_time: 0,
+    }
   }
 
-  const sorted = [...trades].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  let peak = startingBalance || 0
+  let maxDrawdown = 0
+  let currentDrawdown = 0
+  let drawdownPeriods = 0
+  let inDrawdown = false
 
-  let balance = startingBalance;
-  let peak = startingBalance;
-  let maxDD = 0;
-  let maxDDPercent = 0;
-  let maxDDDate = '';
-  let consLoss = 0;
-  let maxConsLoss = 0;
-
-  sorted.forEach((t) => {
-    balance += t.pnl ?? 0;
-    if (balance > peak) peak = balance;
-
-    const dd    = peak - balance;
-    const ddPct = peak > 0 ? (dd / peak) * 100 : 0;
-
-    if (dd > maxDD) {
-      maxDD        = dd;
-      maxDDPercent = ddPct;
-      maxDDDate    = t.date;
+  trades.forEach(trade => {
+    const pnl = trade.pnl || 0
+    peak = Math.max(peak, peak + pnl)
+    currentDrawdown = peak - (peak + pnl)
+    maxDrawdown = Math.max(maxDrawdown, currentDrawdown)
+    
+    if (currentDrawdown > 0 && !inDrawdown) {
+      drawdownPeriods++
+      inDrawdown = true
+    } else if (currentDrawdown === 0 && inDrawdown) {
+      inDrawdown = false
     }
-
-    if (t.status === 'loss') {
-      consLoss++;
-      if (consLoss > maxConsLoss) maxConsLoss = consLoss;
-    } else {
-      consLoss = 0;
-    }
-  });
-
-  // Current consecutive losses (from tail)
-  let currentConsLoss = 0;
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    if (sorted[i].status === 'loss') currentConsLoss++;
-    else break;
-  }
-
-  const currentDD = peak > 0 ? ((peak - balance) / peak) * 100 : 0;
+  })
 
   return {
-    maxDrawdownDollar: maxDD,
-    maxDrawdownPercent: maxDDPercent,
-    maxDrawdownDate: maxDDDate,
-    maxConsecutiveLosses: maxConsLoss,
-    currentConsecutiveLosses: currentConsLoss,
-    currentDrawdownFromPeak: currentDD,
-  };
+    max_drawdown: maxDrawdown,
+    current_drawdown: currentDrawdown,
+    drawdown_periods: drawdownPeriods,
+    recovery_time: 0, // Would need more complex calculation
+  }
 }
 
-// ─── Calendar builder ─────────────────────────────────────────────────────────
+export function buildCalendarData(trades: Trade[]): DayStats[] {
+  const dailyMap = new Map<string, DayStats>()
 
-export function buildCalendarData(trades: Trade[]): Record<string, DayStats> {
-  const map: Record<string, DayStats> = {};
-  trades.forEach((t) => {
-    if (!map[t.date]) map[t.date] = { date: t.date, pnl: 0, tradeCount: 0, winCount: 0 };
-    map[t.date].pnl        += t.pnl ?? 0;
-    map[t.date].tradeCount += 1;
-    if (t.status === 'win') map[t.date].winCount += 1;
-  });
-  return map;
+  trades.forEach(trade => {
+    const date = trade.date
+    const existing = dailyMap.get(date) || {
+      date,
+      trades: 0,
+      pnl: 0,
+      win_rate: 0,
+      max_drawdown: 0,
+    }
+
+    existing.trades++
+    existing.pnl += trade.pnl || 0
+
+    dailyMap.set(date, existing)
+  })
+
+  // Calculate win rates and drawdowns
+  dailyMap.forEach((day, date) => {
+    const dayTrades = trades.filter(t => t.date === date)
+    const wins = dayTrades.filter(t => t.status === 'win').length
+    day.win_rate = day.trades > 0 ? (wins / day.trades) * 100 : 0
+    
+    // Simple drawdown calculation for the day
+    day.max_drawdown = Math.min(0, day.pnl)
+  })
+
+  return Array.from(dailyMap.values()).sort((a, b) => 
+    new Date(a.date).getTime() - new Date(b.date).getTime()
+  )
 }

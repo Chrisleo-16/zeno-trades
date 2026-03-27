@@ -45,6 +45,7 @@ const STATUS_CONFIG: Record<TradeStatus, { color: string; bg: string; border: st
   loss:      { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.2)' },
   breakeven: { color: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)' },
   pending:   { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)' },
+  open:      { color: '#60a5fa', bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.2)' },
 };
 
 // ─── Mini select ──────────────────────────────────────────────────────────────
@@ -150,27 +151,34 @@ export default function JournalPage() {
 
     const trade: Trade = {
       id:                 Math.random().toString(36).substr(2, 9),
+      user_id:            'current_user',
       date:               new Date().toISOString().split('T')[0],
-      entryTime:          new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      pair:               formData.pair,
-      type:               formData.type,
+      entry_time:         new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       entryPrice,
       exitPrice,
-      quantity,
+      entry_price:        entryPrice || 0,
+      exit_price:         exitPrice,
+      pair:               formData.pair,
+      type:               formData.type,
+      size:               quantity,
       pnl,
-      riskAmount:         riskUSD,
+      risk_amount:        riskUSD,
       rMultiple:          riskUSD && riskUSD > 0 && pnl != null
+                            ? parseFloat((pnl / riskUSD).toFixed(2))
+                            : undefined,
+      r_multiple:         riskUSD && riskUSD > 0 && pnl != null
                             ? parseFloat((pnl / riskUSD).toFixed(2))
                             : undefined,
       status,
       tags:               formData.tags,
       notes:              formData.notes,
-      checklistCompleted: true,
-      violations:         [],
-      strategyUsed:       formData.strategyUsed,
-      emotionalState:     formData.emotionalState,
-      sessionType:        'london',
       reviewed:           false,
+      session:            'london',
+      emotional_state:    formData.emotionalState || 'calm',
+      strategy:           formData.strategyUsed,
+      violations:         [],
+      created_at:         new Date().toISOString(),
+      updated_at:         new Date().toISOString(),
     };
 
     tradesStore.add(trade);
@@ -307,12 +315,12 @@ export default function JournalPage() {
                       </td>
                       {/* Entry */}
                       <td className="py-3 px-3">
-                        <span className="text-white/50 text-xs" style={{ fontFamily: "'DM Mono',monospace" }}>${trade.entryPrice.toFixed(4)}</span>
+                        <span className="text-white/50 text-xs" style={{ fontFamily: "'DM Mono',monospace" }}>${(trade.entryPrice || trade.entry_price || 0).toFixed(4)}</span>
                       </td>
                       {/* Exit */}
                       <td className="py-3 px-3">
                         <span className="text-white/50 text-xs" style={{ fontFamily: "'DM Mono',monospace" }}>
-                          {trade.exitPrice ? `$${trade.exitPrice.toFixed(4)}` : '—'}
+                          {(trade.exitPrice || trade.exit_price) ? `$${(trade.exitPrice || trade.exit_price || 0).toFixed(4)}` : '—'}
                         </span>
                       </td>
                       {/* P&L */}

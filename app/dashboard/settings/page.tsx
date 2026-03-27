@@ -59,11 +59,11 @@ export default function SettingsPage() {
       setFormData({
         name: savedProfile.name,
         email: savedProfile.email,
-        tradingStyle: savedProfile.tradingStyle,
-        experience: savedProfile.experience,
-        riskTolerance: savedProfile.riskTolerance,
-        preferredSession: savedProfile.preferredSession,
-        targetAccount: savedProfile.targetAccount,
+        tradingStyle: savedProfile.trading_style || '',
+        experience: savedProfile.experience || '',
+        riskTolerance: savedProfile.risk_tolerance || '',
+        preferredSession: savedProfile.preferred_session,
+        targetAccount: savedProfile.target_account,
       });
     } else {
       const user = authStore.getCurrentUser();
@@ -78,8 +78,15 @@ export default function SettingsPage() {
     try {
       const updated: UserProfile = {
         id: profile?.id || Math.random().toString(36).substr(2, 9),
+        user_id: profile?.user_id || authStore.getCurrentUser()?.id || '',
         ...formData,
-        createdAt: profile?.createdAt || new Date().toISOString(),
+        trading_style: formData.tradingStyle,
+        experience: formData.experience,
+        risk_tolerance: formData.riskTolerance,
+        preferred_session: formData.preferredSession,
+        target_account: formData.targetAccount,
+        created_at: profile?.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
       profileStore.set(updated);
       setProfile(updated);
@@ -107,7 +114,7 @@ export default function SettingsPage() {
           style={{ ...inputStyle, textAlign: 'left' }}
         >
           <span style={{ color: value ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.2)' }}>{value || 'Select…'}</span>
-          <ChevronDown className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
+          <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'rgba(255,255,255,0.2)' }} />
         </button>
         <AnimatePresence>
           {open && (
@@ -137,12 +144,12 @@ export default function SettingsPage() {
   };
 
   const Toggle = ({ value, onChange }: { value: boolean; onChange: () => void }) => (
-    <button onClick={onChange} className="relative flex-shrink-0" style={{ width: 44, height: 24 }}>
+    <button onClick={onChange} className="relative shrink-0" style={{ width: 44, height: 24 }}>
       <div className="w-full h-full rounded-full transition-all" style={{ background: value ? 'rgba(0,255,135,0.3)' : 'rgba(255,255,255,0.08)', border: `1px solid ${value ? 'rgba(0,255,135,0.4)' : 'rgba(255,255,255,0.1)'}` }} />
       <motion.div
         animate={{ x: value ? 22 : 2 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-        className="absolute top-[3px] w-[18px] h-[18px] rounded-full"
+        className="absolute top-0.75 w-4.5 h-4.5 rounded-full"
         style={{ background: value ? '#00ff87' : 'rgba(255,255,255,0.3)', boxShadow: value ? '0 0 8px rgba(0,255,135,0.6)' : 'none' }}
       />
     </button>
@@ -366,7 +373,7 @@ export default function SettingsPage() {
                 className="w-full flex items-center gap-3 p-3 rounded-xl text-sm transition-colors hover:bg-white/4"
                 style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', textAlign: 'left' }}
               >
-                <Icon className={`w-4 h-4 flex-shrink-0 ${item.color}`} />
+                <Icon className={`w-4 h-4 shrink-0 ${item.color}`} />
                 {item.label}
               </button>
             );
