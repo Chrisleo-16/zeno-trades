@@ -93,11 +93,12 @@ export interface DrawdownStats {
   current_drawdown: number
   drawdown_periods: number
   recovery_time: number
-  maxDrawdownDollar?: number
-  maxDrawdownPercent?: number
-  maxDrawdownDate?: string
-  maxConsecutiveLosses?: number
-  currentConsecutiveLosses?: number
+  maxDrawdownDollar: number
+  maxDrawdownPercent: number
+  maxDrawdownDate: string
+  maxConsecutiveLosses: number
+  currentConsecutiveLosses: number
+  currentDrawdownFromPeak: number
 }
 
 export interface DayStats {
@@ -106,8 +107,8 @@ export interface DayStats {
   pnl: number
   win_rate: number
   max_drawdown: number
-  tradeCount?: number
-  winCount?: number
+  tradeCount: number
+  winCount: number
 }
 
 export interface LearningModule {
@@ -587,35 +588,91 @@ export function calcDrawdown(trades: Trade[], startingBalance?: number): Drawdow
       current_drawdown: 0,
       drawdown_periods: 0,
       recovery_time: 0,
+      currentDrawdownFromPeak: 0,
+      maxDrawdownDollar: 0,
+      maxDrawdownPercent: 0,
+      maxDrawdownDate: '',
+      maxConsecutiveLosses: 0,
+      currentConsecutiveLosses: 0,
+    };
+  }
+
+  let peak = startingBalance || 0;
+  let maxDrawdownDollar = 0;
+  let maxDrawdownPercent = 0;
+  let maxDrawdownDate = '';
+  let drawdownPeriods = 0;
+  let inDrawdown = false;
+  let consecutiveLossCount = 0;
+  let maxConsecutiveLosses = 0;
+  let currentConsecutiveLosses = 0;
+  let currentDrawdownFromPeak = 0;
+
+  // Sort trades by date to ensure chronological order
+  const sortedTrades = [...trades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  for (const trade of sortedTrades) {
+    const pnl = trade.pnl || 0;
+    const newEquity = peak + pnl;
+
+    // Update peak if equity reaches new high
+    if (newEquity > peak) {
+      peak = newEquity;
+      // When a new peak is reached, we are no longer in drawdown
+      if (inDrawdown) {
+        inDrawdown = false;
+      }
+    }
+
+    // Calculate current drawdown from the most recent peak
+    const currentDD = peak - newEquity;
+    if (currentDD > 0) {
+      currentDrawdownFromPeak = currentDD;
+      if (!inDrawdown) {
+        inDrawdown = true;
+        drawdownPeriods++;
+      }
+      // Track maximum drawdown in dollars and percent
+      if (currentDD > maxDrawdownDollar) {
+        maxDrawdownDollar = currentDD;
+        maxDrawdownPercent = (maxDrawdownDollar / peak) * 100;
+        maxDrawdownDate = trade.date;
+      }
+    } else {
+      currentDrawdownFromPeak = 0;
+      inDrawdown = false;
+    }
+
+    // Consecutive losses tracking
+    if (trade.status === 'loss') {
+      consecutiveLossCount++;
+      currentConsecutiveLosses = consecutiveLossCount;
+      if (consecutiveLossCount > maxConsecutiveLosses) {
+        maxConsecutiveLosses = consecutiveLossCount;
+      }
+    } else {
+      consecutiveLossCount = 0;
+      currentConsecutiveLosses = 0;
     }
   }
 
-  let peak = startingBalance || 0
-  let maxDrawdown = 0
-  let currentDrawdown = 0
-  let drawdownPeriods = 0
-  let inDrawdown = false
-
-  trades.forEach(trade => {
-    const pnl = trade.pnl || 0
-    peak = Math.max(peak, peak + pnl)
-    currentDrawdown = peak - (peak + pnl)
-    maxDrawdown = Math.max(maxDrawdown, currentDrawdown)
-    
-    if (currentDrawdown > 0 && !inDrawdown) {
-      drawdownPeriods++
-      inDrawdown = true
-    } else if (currentDrawdown === 0 && inDrawdown) {
-      inDrawdown = false
-    }
-  })
+  // Final current drawdown (if still in drawdown after last trade)
+  const finalEquity = sortedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0) + (startingBalance || 0);
+  const finalPeak = Math.max(peak, finalEquity);
+  const finalDrawdown = finalPeak - finalEquity;
 
   return {
-    max_drawdown: maxDrawdown,
-    current_drawdown: currentDrawdown,
+    max_drawdown: maxDrawdownDollar,
+    current_drawdown: finalDrawdown,
     drawdown_periods: drawdownPeriods,
-    recovery_time: 0, // Would need more complex calculation
-  }
+    recovery_time: 0, // Requires additional logic (tracking time between peak and new ATH)
+    currentDrawdownFromPeak: currentDrawdownFromPeak,
+    maxDrawdownDollar: maxDrawdownDollar,
+    maxDrawdownPercent: maxDrawdownPercent,
+    maxDrawdownDate: maxDrawdownDate,
+    maxConsecutiveLosses: maxConsecutiveLosses,
+    currentConsecutiveLosses: currentConsecutiveLosses,
+  };
 }
 
 export function buildCalendarData(trades: Trade[]): DayStats[] {
@@ -629,9 +686,12 @@ export function buildCalendarData(trades: Trade[]): DayStats[] {
       pnl: 0,
       win_rate: 0,
       max_drawdown: 0,
+      tradeCount: 0,
+      winCount: 0,
     }
 
     existing.trades++
+    existing.tradeCount++
     existing.pnl += trade.pnl || 0
 
     dailyMap.set(date, existing)
@@ -642,6 +702,7 @@ export function buildCalendarData(trades: Trade[]): DayStats[] {
     const dayTrades = trades.filter(t => t.date === date)
     const wins = dayTrades.filter(t => t.status === 'win').length
     day.win_rate = day.trades > 0 ? (wins / day.trades) * 100 : 0
+    day.winCount = wins
     
     // Simple drawdown calculation for the day
     day.max_drawdown = Math.min(0, day.pnl)
